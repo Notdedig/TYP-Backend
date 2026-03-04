@@ -1,0 +1,140 @@
+{
+  "info": {
+    "name": "Cognitive Load API",
+    "description": "API endpoints for cognitive load estimation system",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Heart Rate",
+      "item": [
+        {
+          "name": "Send Heart Rate Data (ESP32)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"heartRate\": 75.5\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/heartrate",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "heartrate"]
+            }
+          }
+        },
+        {
+          "name": "Get Heart Rate Data",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:8080/api/heartrate",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "heartrate"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Breath Rate",
+      "item": [
+        {
+          "name": "Get Breath Rate Data",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:8080/api/breathrate",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "breathrate"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cognitive Load",
+      "item": [
+        {
+          "name": "Get Predicted Cognitive Load",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:8080/api/cognitive-load/predicted",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "cognitive-load", "predicted"]
+            }
+          }
+        },
+        {
+          "name": "Get Current Cognitive Load",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:8080/api/cognitive-load/current",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "cognitive-load", "current"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Calibration",
+      "item": [
+        {
+          "name": "Start Calibration",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"seeedStudioIp\": \"192.168.1.100\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/calibrate/start",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "calibrate", "start"]
+            }
+          }
+        },
+        {
+          "name": "Get Calibration Status",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:8080/api/calibrate/status",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "calibrate", "status"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
