@@ -110,6 +110,26 @@ class CognitiveLoadService:
                 if heart_rate and heart_rate > 0:
                     self.calibration_heart_rates.append(heart_rate)
     
+    def add_breath_rate_reading(self, breath_rate):
+        """Add a breath rate reading
+
+        During calibration we skip zero values so the baseline isn't pulled down by
+        missing/invalid measurements. We still update ``current_breath_rate`` for
+        overall tracking.
+        """
+        with self.lock:
+            self.current_breath_rate = breath_rate
+
+            if self._is_calibrating:
+                # ignore zeros while calibrating
+                if breath_rate and breath_rate > 0:
+                    self.calibration_breath_rates.append(breath_rate)
+                    
+            # Log the breath rate reading
+            if not self._is_calibrating:
+                readable_time = time.strftime("%H:%M:%S")
+                print(f"[{readable_time}] Breath Rate: {breath_rate}")
+    
     def get_breath_rate_from_esphome(self):
         """Get current breath rate from ESPHome listener"""
         with self.lock:
@@ -165,7 +185,6 @@ class CognitiveLoadService:
                 return
             
             # seeed_studio_ip parameter kept for API compatibility
-            # We get breath rate directly from ESPHome
             self.seeed_studio_ip = seeed_studio_ip
             self._is_calibrating = True
             self._is_calibrated = False
@@ -174,22 +193,19 @@ class CognitiveLoadService:
             self.calibration_breath_rates = []
         
         print("[*] Calibration started for 90 seconds...")
-        
-        if not self.esphome_connected:
-            print("[WARN] Warning: ESPHome breath sensor not connected!")
+        print("[*] Both sensors should be posting data during this period...")
         
         # Calibration loop
         start_time = time.time()
         while time.time() - start_time < self.CALIBRATION_DURATION_SECONDS:
-            # Get breath rate from ESPHome listener
-            breath_rate = self.get_breath_rate_from_esphome()
-            
-            with self.lock:
-                self.calibration_breath_rates.append(breath_rate)
-            
             elapsed = int(time.time() - start_time)
+            remaining = self.CALIBRATION_DURATION_SECONDS - elapsed
+            
             if elapsed % 10 == 0:  # Print every 10 seconds
-                print(f"Calibration progress: {elapsed}s / 90s (HR: {len(self.calibration_heart_rates)}, BR: {len(self.calibration_breath_rates)})")
+                with self.lock:
+                    hr_count = len(self.calibration_heart_rates)
+                    br_count = len(self.calibration_breath_rates)
+                print(f"Calibration progress: {elapsed}s / 90s (HR: {hr_count}, BR: {br_count})")
             
             time.sleep(self.CALIBRATION_SAMPLING_INTERVAL)
         

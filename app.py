@@ -23,6 +23,7 @@ def home():
         "version": "1.0.0",
         "endpoints": {
             "POST /api/heartrate": "Receive heart rate data",
+            "POST /api/breathrate": "Receive breath rate data",
             "GET /api/heartrate": "Get heart rate data",
             "GET /api/breathrate": "Get breath rate data",
             "GET /api/cognitive-load/current": "Get current cognitive load",
@@ -70,6 +71,36 @@ def get_heartrate():
         "currentHeartRate": service.get_current_heart_rate(),
         "baselineHeartRate": service.get_baseline_heart_rate(),
         "isCalibrated": service.is_calibrated()
+    })
+
+
+@app.route('/api/breathrate', methods=['POST'])
+def receive_breathrate():
+    """Receive breath rate data from sensor"""
+    remote = request.remote_addr
+    print(f"Incoming POST /api/breathrate from {remote}")
+    try:
+        raw = request.get_data(as_text=True)
+        print(f"Raw body: {raw}")
+        # Parse JSON silently to avoid raising on bad content-type
+        data = request.get_json(silent=True)
+    except Exception as e:
+        print(f"Error reading request body: {e}")
+        data = None
+
+    if not data or 'breathRate' not in data:
+        print("Invalid payload or missing 'breathRate' field")
+        return jsonify({
+            "status": "error",
+            "message": "breathRate field is required"
+        }), 400
+
+    breath_rate = data['breathRate']
+    service.add_breath_rate_reading(breath_rate)
+
+    return jsonify({
+        "status": "success",
+        "message": "Breath rate received"
     })
 
 

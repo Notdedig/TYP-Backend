@@ -21,7 +21,7 @@
    - Start: Today
    - Recur every: 1 days
    - Click Next
-
+an
 5. **Action:** Start a program
    - Program/script: `C:\DuckDNS\duckdns-update.bat`
    - Click Next → Finish

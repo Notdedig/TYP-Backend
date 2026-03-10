@@ -15,3 +15,4 @@ if %ERRORLEVEL% EQU 0 (
 ) else (
     echo [%date% %time%] Failed to update DuckDNS >> duckdns.log
 )
+
