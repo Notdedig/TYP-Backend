@@ -28,6 +28,8 @@ def home():
             "GET /api/breathrate": "Get breath rate data",
             "GET /api/cognitive-load/current": "Get current cognitive load",
             "GET /api/cognitive-load/predicted": "Get predicted cognitive load",
+            "GET /api/cognitive-load/current/uno": "Get only current cognitive load value (number)",
+            "GET /api/cognitive-load/predicted/uno": "Get only predicted cognitive load value (number)",
             "POST /api/calibrate/start": "Start calibration",
             "GET /api/calibrate/status": "Get calibration status"
         }
@@ -143,6 +145,18 @@ def get_current_cognitive_load():
         "paasScale": "1-9",
         "isCalibrated": service.is_calibrated()
     })
+
+
+@app.route('/api/cognitive-load/current/uno', methods=['GET'])
+def get_current_cognitive_load_value():
+    """Get only the numerical value of current cognitive load"""
+    return str(service.calculate_cognitive_load())
+
+
+@app.route('/api/cognitive-load/predicted/uno', methods=['GET'])
+def get_predicted_cognitive_load_value():
+    """Get only the numerical value of predicted cognitive load"""
+    return str(service.calculate_cognitive_load())
 
 
 @app.route('/api/calibrate/start', methods=['POST'])
