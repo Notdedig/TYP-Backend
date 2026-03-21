@@ -8,7 +8,6 @@ import requests
 import asyncio
 import threading
 from threading import Lock
-from aioesphomeapi import APIClient
 
 
 class CognitiveLoadService:
@@ -20,6 +19,9 @@ class CognitiveLoadService:
     CALIBRATION_SAMPLING_INTERVAL = 1  # Sample every second
     
     def __init__(self):
+
+        self.lock = Lock()
+        
         # Baseline values
         self.baseline_heart_rate = 0.0
         self.baseline_breath_rate = 0.0
@@ -32,69 +34,11 @@ class CognitiveLoadService:
         self._is_calibrated = False
         self._is_calibrating = False
         self.calibration_start_time = 0
-        self.seeed_studio_ip = ""
         
         # Data storage during calibration
         self.calibration_heart_rates = []
         self.calibration_breath_rates = []
         
-        # Thread safety
-        self.lock = Lock()
-        
-        # ESPHome breath sensor configuration
-        self.esp_ip = "10.16.129.122"
-        self.breath_key = 3149911513
-        self.latest_breath = 0.0
-        self.esphome_connected = False
-        
-        # ESP32 heart-rate HTTP server to poll (default provided by user)
-        self.heart_sensor_ip = "10.16.129.173"
-        self.heart_sensor_port = 80
-        self.heart_poll_interval = 1.0  # seconds
-        
-        # Start ESPHome listener and heart-rate poller in background
-        self._start_esphome_listener()
-        self._start_esp32_poller()
-    
-    def _start_esphome_listener(self):
-        """Start ESPHome listener in background thread"""
-        def run_listener():
-            asyncio.run(self._esphome_listener())
-        
-        thread = threading.Thread(target=run_listener, daemon=True)
-        thread.start()
-        print(f"[*] Starting ESPHome listener for breath sensor at {self.esp_ip}")
-    
-    async def _esphome_listener(self):
-        """Listen to ESPHome device for breath rate updates"""
-        try:
-            client = APIClient(self.esp_ip, 6053, None)
-            await client.connect(login=True)
-            self.esphome_connected = True
-            print(f"[OK] Connected to ESPHome breath sensor at {self.esp_ip}")
-            
-            def on_state(state):
-                if hasattr(state, "key") and state.key == self.breath_key:
-                    with self.lock:
-                        self.latest_breath = float(state.state)
-                        self.current_breath_rate = self.latest_breath
-
-                    # only log when not calibrating (calibration output should be quiet)
-                    if not self._is_calibrating:
-                        readable_time = time.strftime("%H:%M:%S")
-                        print(f"[{readable_time}] Breath Rate: {self.latest_breath}")
-            
-            client.subscribe_states(on_state)
-            
-            # Keep connection alive
-            while True:
-                await asyncio.sleep(1)
-                
-        except Exception as e:
-            self.esphome_connected = False
-            print(f"[ERROR] ESPHome connection error: {e}")
-            print("[WARN] Breath rate will not update until connection is restored")
-    
     def add_heart_rate_reading(self, heart_rate):
         """Add a heart rate reading
 
@@ -129,11 +73,6 @@ class CognitiveLoadService:
             if not self._is_calibrating:
                 readable_time = time.strftime("%H:%M:%S")
                 print(f"[{readable_time}] Breath Rate: {breath_rate}")
-    
-    def get_breath_rate_from_esphome(self):
-        """Get current breath rate from ESPHome listener"""
-        with self.lock:
-            return self.latest_breath
 
     def _start_esp32_poller(self):
         """Start a background thread to poll the ESP32 /bpm endpoint for heart rate readings"""
@@ -177,15 +116,13 @@ class CognitiveLoadService:
 
             time.sleep(self.heart_poll_interval)
     
-    def start_calibration(self, seeed_studio_ip):
+    def start_calibration(self):
         """Start 90-second calibration process"""
         with self.lock:
             if self._is_calibrating:
                 print("Calibration already in progress")
                 return
             
-            # seeed_studio_ip parameter kept for API compatibility
-            self.seeed_studio_ip = seeed_studio_ip
             self._is_calibrating = True
             self._is_calibrated = False
             self.calibration_start_time = time.time()

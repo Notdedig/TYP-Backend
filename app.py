@@ -162,18 +162,8 @@ def get_predicted_cognitive_load_value():
 @app.route('/api/calibrate/start', methods=['POST'])
 def start_calibration():
     """Start 90-second calibration process"""
-    data = request.get_json()
-    
-    if not data or 'seeedStudioIp' not in data:
-        return jsonify({
-            "status": "error",
-            "message": "seeedStudioIp is required"
-        }), 400
-    
-    seeed_studio_ip = data['seeedStudioIp']
-    
     # Start calibration in background thread
-    thread = threading.Thread(target=service.start_calibration, args=(seeed_studio_ip,))
+    thread = threading.Thread(target=service.start_calibration)
     thread.daemon = True
     thread.start()
     

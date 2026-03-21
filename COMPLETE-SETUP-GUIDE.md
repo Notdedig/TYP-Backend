@@ -248,9 +248,7 @@ If breath rate is 0.0, check:
 
 #### 3.4 Start Calibration
 ```bash
-curl -X POST http://localhost:8080/api/calibrate/start \
-  -H "Content-Type: application/json" \
-  -d "{\"seeedStudioIp\": \"10.16.129.122\"}"
+curl -X POST http://localhost:8080/api/calibrate/start
 ```
 
 **During calibration (90 seconds):**
@@ -383,9 +381,7 @@ curl http://localhost:8080/api/cognitive-load/predicted
 ### POST /api/calibrate/start
 Start 90-second calibration
 ```bash
-curl -X POST http://localhost:8080/api/calibrate/start \
-  -H "Content-Type: application/json" \
-  -d '{"seeedStudioIp": "10.16.129.122"}'
+curl -X POST http://localhost:8080/api/calibrate/start
 ```
 
 ### GET /api/calibrate/status

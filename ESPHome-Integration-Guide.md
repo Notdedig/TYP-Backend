@@ -61,12 +61,10 @@ python app.py
 ### Step 3: Start Calibration
 
 ```bash
-curl -X POST http://localhost:8080/api/calibrate/start \
-  -H "Content-Type: application/json" \
-  -d '{"seeedStudioIp": "10.16.129.122"}'
+curl -X POST http://localhost:8080/api/calibrate/start
 ```
 
-**Note:** The IP parameter is kept for API compatibility but not actually used for HTTP requests. The backend connects directly via ESPHome API.
+**Note:** The backend connects directly via ESPHome API for breath monitoring.
 
 ## 🔧 Configuration
 

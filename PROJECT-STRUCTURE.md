@@ -200,9 +200,7 @@ curl http://localhost:8080/api/heartrate
 
 ### To Calibrate:
 ```bash
-curl -X POST http://localhost:8080/api/calibrate/start \
-  -H "Content-Type: application/json" \
-  -d '{"seeedStudioIp": "10.16.129.122"}'
+curl -X POST http://localhost:8080/api/calibrate/start
 ```
 
 ---

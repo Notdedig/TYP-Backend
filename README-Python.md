@@ -88,9 +88,7 @@ curl http://localhost:8080/api/heartrate
 ### 4. Start Calibration
 
 ```bash
-curl -X POST http://localhost:8080/api/calibrate/start \
-  -H "Content-Type: application/json" \
-  -d "{\"seeedStudioIp\": \"192.168.1.100\"}"
+curl -X POST http://localhost:8080/api/calibrate/start
 ```
 
 ### 5. Check Calibration Status
