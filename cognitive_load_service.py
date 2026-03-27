@@ -5,7 +5,6 @@ Handles calibration and cognitive load calculations
 
 import time
 import requests
-import asyncio
 import threading
 from threading import Lock
 
@@ -14,68 +13,54 @@ class CognitiveLoadService:
     # Constants for cognitive load calculation
     WEIGHT_HR = 0.6
     WEIGHT_BR = 0.4
-    MAX_DELTA_FOR_PAAS_9 = 0.40  # 40% increase maps to Paas 9
+    MAX_DELTA_FOR_PAAS_9 = 0.15  # 40% increase maps to Paas 9
     CALIBRATION_DURATION_SECONDS = 90
     CALIBRATION_SAMPLING_INTERVAL = 1  # Sample every second
-    
-    def __init__(self):
 
+    def __init__(self):
         self.lock = Lock()
-        
+
         # Baseline values
         self.baseline_heart_rate = 0.0
         self.baseline_breath_rate = 0.0
-        
+
         # Current values
         self.current_heart_rate = 0.0
         self.current_breath_rate = 0.0
-        
+
         # Calibration state
         self._is_calibrated = False
         self._is_calibrating = False
         self.calibration_start_time = 0
-        
+
         # Data storage during calibration
         self.calibration_heart_rates = []
         self.calibration_breath_rates = []
-        
-    def add_heart_rate_reading(self, heart_rate):
-        """Add a heart rate reading
 
-        During calibration we skip zero values so the baseline isn't pulled down by
-        missing/invalid measurements. We still update ``current_heart_rate`` for
-        overall tracking.
-        """
+    def add_heart_rate_reading(self, heart_rate):
+        """Add a heart rate reading"""
         with self.lock:
             self.current_heart_rate = heart_rate
 
-            if self._is_calibrating:
-                # ignore zeros while calibrating
-                if heart_rate and heart_rate > 0:
-                    self.calibration_heart_rates.append(heart_rate)
-    
-    def add_breath_rate_reading(self, breath_rate):
-        """Add a breath rate reading
+            if self._is_calibrating and heart_rate > 0:
+                self.calibration_heart_rates.append(heart_rate)
 
-        During calibration we skip zero values so the baseline isn't pulled down by
-        missing/invalid measurements. We still update ``current_breath_rate`` for
-        overall tracking.
-        """
+    def add_breath_rate_reading(self, breath_rate):
+        """Add a breath rate reading"""
         with self.lock:
             self.current_breath_rate = breath_rate
 
-            if self._is_calibrating:
-                # ignore zeros while calibrating
-                if breath_rate and breath_rate > 0:
-                    self.calibration_breath_rates.append(breath_rate)
-                    
-            # Log the breath rate reading
-            if not self._is_calibrating:
-                readable_time = time.strftime("%H:%M:%S")
-                print(f"[{readable_time}] Breath Rate: {breath_rate}")
+            if self._is_calibrating and breath_rate > 0:
+                self.calibration_breath_rates.append(breath_rate)
+
+        # Log outside lock
+        if not self._is_calibrating:
+            readable_time = time.strftime("%H:%M:%S")
+            print(f"[{readable_time}] Breath Rate: {breath_rate}")
 
     def _start_esp32_poller(self):
-        """Start a background thread to poll the ESP32 /bpm endpoint for heart rate readings"""
+        """Start background thread for ESP32 polling"""
+
         def run_poller():
             try:
                 self._esp32_poller()
@@ -84,201 +69,185 @@ class CognitiveLoadService:
 
         thread = threading.Thread(target=run_poller, daemon=True)
         thread.start()
-        print(f"[*] Starting ESP32 poller for heart sensor at {self.heart_sensor_ip}:{self.heart_sensor_port}")
+
+        print(
+            f"[*] Starting ESP32 poller at "
+            f"{self.heart_sensor_ip}:{self.heart_sensor_port}"
+        )
 
     def _esp32_poller(self):
-        """Continuously poll the ESP32 HTTP server for a BPM value and add it as a heart rate reading."""
+        """Continuously poll ESP32 for heart rate"""
         url = f"http://{self.heart_sensor_ip}:{self.heart_sensor_port}/bpm"
+
         while True:
             try:
                 resp = requests.get(url, timeout=2)
+
                 if resp.status_code == 200:
                     text = resp.text.strip()
+
                     try:
-                        # Allow integer or float values
-                        hr = float(text)
-                        hr = int(hr)
-                        # Basic sanity checks
+                        hr = int(float(text))
+
                         if 0 < hr < 250:
                             self.add_heart_rate_reading(hr)
-                            # avoid log spam during calibration
+
                             if not self._is_calibrating:
                                 readable_time = time.strftime("%H:%M:%S")
                                 print(f"[{readable_time}] Polled HR: {hr}")
                         else:
-                            print(f"[WARN] Polled HR out of range: {text}")
+                            print(f"[WARN] HR out of range: {text}")
+
                     except ValueError:
-                        print(f"[WARN] Could not parse HR from response: {text}")
+                        print(f"[WARN] Invalid HR response: {text}")
                 else:
-                    print(f"[WARN] ESP32 poll returned status {resp.status_code}")
+                    print(f"[WARN] Status {resp.status_code}")
+
             except requests.RequestException as e:
-                print(f"[ERROR] Error polling ESP32 ({url}): {e}")
+                print(f"[ERROR] ESP32 polling failed: {e}")
 
             time.sleep(self.heart_poll_interval)
-    
+
     def start_calibration(self):
-        """Start 90-second calibration process"""
+        """Start 90-second calibration"""
         with self.lock:
             if self._is_calibrating:
                 print("Calibration already in progress")
                 return
-            
+
             self._is_calibrating = True
             self._is_calibrated = False
             self.calibration_start_time = time.time()
-            self.calibration_heart_rates = []
-            self.calibration_breath_rates = []
-        
-        print("[*] Calibration started for 90 seconds...")
-        print("[*] Both sensors should be posting data during this period...")
-        
-        # Calibration loop
+            self.calibration_heart_rates.clear()
+            self.calibration_breath_rates.clear()
+
+        print("[*] Calibration started (90 seconds)...")
+
         start_time = time.time()
+
         while time.time() - start_time < self.CALIBRATION_DURATION_SECONDS:
             elapsed = int(time.time() - start_time)
-            remaining = self.CALIBRATION_DURATION_SECONDS - elapsed
-            
-            if elapsed % 10 == 0:  # Print every 10 seconds
+
+            if elapsed % 10 == 0:
                 with self.lock:
-                    hr_count = len(self.calibration_heart_rates)
-                    br_count = len(self.calibration_breath_rates)
-                print(f"Calibration progress: {elapsed}s / 90s (HR: {hr_count}, BR: {br_count})")
-            
+                    print(
+                        f"Progress: {elapsed}s / 90s "
+                        f"(HR: {len(self.calibration_heart_rates)}, "
+                        f"BR: {len(self.calibration_breath_rates)})"
+                    )
+
             time.sleep(self.CALIBRATION_SAMPLING_INTERVAL)
-        
+
         self._finish_calibration()
-    
+
     def _finish_calibration(self):
-        """Finish calibration and calculate baselines"""
+        """Compute baselines"""
         with self.lock:
             self._is_calibrating = False
-            
-            # Calculate average heart rate
+
             if self.calibration_heart_rates:
-                self.baseline_heart_rate = sum(self.calibration_heart_rates) / len(self.calibration_heart_rates)
-            
-            # Calculate average breath rate
+                self.baseline_heart_rate = (
+                    sum(self.calibration_heart_rates)
+                    / len(self.calibration_heart_rates)
+                )
+
             if self.calibration_breath_rates:
-                self.baseline_breath_rate = sum(self.calibration_breath_rates) / len(self.calibration_breath_rates)
-            
+                self.baseline_breath_rate = (
+                    sum(self.calibration_breath_rates)
+                    / len(self.calibration_breath_rates)
+                )
+
             self._is_calibrated = True
-            
+
             print("[OK] Calibration complete!")
-            print(f"Baseline Heart Rate: {self.baseline_heart_rate:.2f}")
-            print(f"Baseline Breath Rate: {self.baseline_breath_rate:.2f}")
-            print(f"Samples collected - HR: {len(self.calibration_heart_rates)}, BR: {len(self.calibration_breath_rates)}")
-            
-            # Clear calibration data
-            self.calibration_heart_rates = []
-            self.calibration_breath_rates = []
-    
+            print(f"Baseline HR: {self.baseline_heart_rate:.2f}")
+            print(f"Baseline BR: {self.baseline_breath_rate:.2f}")
+
+            self.calibration_heart_rates.clear()
+            self.calibration_breath_rates.clear()
+
     def get_heart_rate_delta(self):
-        """Calculate heart rate delta"""
         if self.baseline_heart_rate == 0:
             return 0.0
-        return (self.current_heart_rate - self.baseline_heart_rate) / self.baseline_heart_rate
-    
+
+        return (
+            self.current_heart_rate - self.baseline_heart_rate
+        ) / self.baseline_heart_rate
+
     def get_breath_rate_delta(self):
-        """Calculate breath rate delta"""
         if self.baseline_breath_rate == 0:
             return 0.0
-        return (self.current_breath_rate - self.baseline_breath_rate) / self.baseline_breath_rate
-    
+
+        return (
+            self.current_breath_rate - self.baseline_breath_rate
+        ) / self.baseline_breath_rate
+
     def calculate_cognitive_load(self):
-        """
-        Calculate cognitive load using the formula:
-        
-        1. ΔHR = (HR_current - HR_baseline) / HR_baseline
-        2. ΔBR = (BR_current - BR_baseline) / BR_baseline
-        3. Load_raw = max(0, 0.6 × ΔHR + 0.4 × ΔBR)
-        4. Load_Paas = clamp(1 + (Load_raw / 0.40) × 8, 1, 9)
-        
-        Returns: Cognitive load on Paas 9-point scale (1-9)
-        """
+        """Return Paas scale (1–9)"""
         if not self._is_calibrated:
-            return 1.0  # Return minimum Paas score if not calibrated
-        
-        # Current breath rate is automatically updated by ESPHome listener
-        # No need to fetch manually
-        
+            return 1.0
+
         delta_hr = self.get_heart_rate_delta()
         delta_br = self.get_breath_rate_delta()
-        
-        # Calculate raw load
-        load_raw = max(0, self.WEIGHT_HR * delta_hr + self.WEIGHT_BR * delta_br)
-        
-        # Map to Paas 9-point scale
+
+        load_raw = max(
+            0,
+            self.WEIGHT_HR * delta_hr +
+            self.WEIGHT_BR * delta_br
+        )
+
         load_paas = 1 + (load_raw / self.MAX_DELTA_FOR_PAAS_9) * 8
-        
-        # Clamp to valid range [1, 9]
+
         return self._clamp(load_paas, 1.0, 9.0)
-    
+
     def get_predicted_cognitive_load(self):
-        """Predict a future cognitive load value based on recent trends.
-        
-        Maintains an internal sliding window of the last 10 calculated loads.
-        Once at least five samples are available it computes the average of the
-        most recent three and the three values immediately preceding them to
-        determine a simple linear trend.  This trend is extrapolated 30 seconds
-        into the future and clamped to the valid Paas range.
-        """
-        # store last 10 values; make atomic with lock
         with self.lock:
-            if not hasattr(self, 'recent_loads'):
+            if not hasattr(self, "recent_loads"):
                 self.recent_loads = []
-            
+
             current = self.calculate_cognitive_load()
             self.recent_loads.append(current)
-            
-            # keep last 10 values
+
             if len(self.recent_loads) > 10:
                 self.recent_loads.pop(0)
-            
-            # need at least 5 values to predict
-            if len(self.recent_loads) >= 5:
-                # average of last 3 values
+
+            if len(self.recent_loads) >= 6:
                 recent_avg = sum(self.recent_loads[-3:]) / 3
-                
-                # average of 3 values before that
                 older_avg = sum(self.recent_loads[-6:-3]) / 3
-                
-                # calculate trend (is it going up or down?)
+
                 trend = recent_avg - older_avg
-                
-                # predict 30 seconds ahead
                 prediction = current + (trend * 30)
+
                 return self._clamp(prediction, 1.0, 9.0)
-        
-        return current  # not enough data, return current
-    
+
+        return current
+
     @staticmethod
     def _clamp(value, min_val, max_val):
-        """Clamp value between min and max"""
         return max(min_val, min(max_val, value))
-    
+
     def get_remaining_calibration_time(self):
-        """Get remaining calibration time in seconds"""
         if not self._is_calibrating:
             return 0
+
         elapsed = int(time.time() - self.calibration_start_time)
         return max(0, self.CALIBRATION_DURATION_SECONDS - elapsed)
-    
+
     # Getters
     def get_current_heart_rate(self):
         return self.current_heart_rate
-    
+
     def get_current_breath_rate(self):
-        # Breath rate is automatically updated by ESPHome listener
         return self.current_breath_rate
-    
+
     def get_baseline_heart_rate(self):
         return self.baseline_heart_rate
-    
+
     def get_baseline_breath_rate(self):
         return self.baseline_breath_rate
-    
+
     def is_calibrated(self):
         return self._is_calibrated
-    
+
     def is_calibrating(self):
         return self._is_calibrating

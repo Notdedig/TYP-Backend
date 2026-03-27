@@ -110,7 +110,7 @@ def receive_breathrate():
 def get_breathrate():
     """Get current and baseline breath rate data"""
     return jsonify({
-        "currentBreathRate": service.get_current_breath_rate(),
+        "currentBreathRate": service.   get_current_breath_rate(),
         "baselineBreathRate": service.get_baseline_breath_rate(),
         "isCalibrated": service.is_calibrated()
     })
