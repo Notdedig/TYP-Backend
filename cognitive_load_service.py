@@ -13,7 +13,7 @@ class CognitiveLoadService:
     # Constants for cognitive load calculation
     WEIGHT_HR = 0.6
     WEIGHT_BR = 0.4
-    MAX_DELTA_FOR_PAAS_9 = 0.15  # 40% increase maps to Paas 9
+    MAX_DELTA_FOR_PAAS_9 = 0.40  # 40% increase maps to Paas 9
     CALIBRATION_DURATION_SECONDS = 90
     CALIBRATION_SAMPLING_INTERVAL = 1  # Sample every second
 
