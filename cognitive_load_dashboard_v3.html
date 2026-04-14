@@ -1,0 +1,362 @@
+
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  .db{background:#2e294e;padding:14px;font-family:var(--font-sans,sans-serif);color:#efbcd5}
+  .hdr{text-align:center;padding:10px 0 16px}
+  .hdr h1{font-size:17px;font-weight:500;color:#efbcd5;letter-spacing:1px}
+  .hdr p{font-size:11px;color:#be97c6;margin-top:3px}
+  .mrow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-bottom:12px}
+  .mc{background:#3a3560;border:0.5px solid #8661c1;border-radius:10px;padding:11px 13px}
+  .mc .lbl{font-size:10px;color:#be97c6;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px}
+  .mc .val{font-size:24px;font-weight:500;color:#efbcd5}
+  .mc .sub{font-size:10px;color:#be97c6;margin-top:2px}
+  .pbar{width:100%;height:5px;border-radius:3px;background:#1a1735;margin-top:7px;overflow:hidden}
+  .pfill{height:100%;border-radius:3px;background:#8661c1;transition:width 0.4s ease}
+  .crow{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:12px}
+  .cc{background:#3a3560;border:0.5px solid #8661c1;border-radius:10px;padding:11px 13px}
+  .cc .lbl{font-size:10px;color:#be97c6;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:7px}
+  .srow{display:flex;align-items:center;gap:9px}
+  .srow input[type=range]{flex:1;accent-color:#8661c1}
+  .sv{font-size:13px;font-weight:500;color:#efbcd5;min-width:36px;text-align:right}
+  .brow{display:flex;gap:7px;margin-top:9px;flex-wrap:wrap;align-items:center}
+  .btn{background:#8661c1;color:#fff;border:none;border-radius:7px;padding:5px 12px;font-size:11px;cursor:pointer;transition:background 0.15s}
+  .btn:hover{background:#9e7ad4}
+  .btn:disabled{opacity:0.5;cursor:not-allowed}
+  .btn.ok{background:#3a8c6e}.btn.ok:hover{background:#4aad89}
+  .btn.danger{background:#c0446a}.btn.danger:hover{background:#d4557c}
+  .sdot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px;flex-shrink:0}
+  .g{background:#4aad89}.am{background:#e8a838}.r{background:#c0446a}
+  .chart-card{background:#3a3560;border:0.5px solid #8661c1;border-radius:10px;padding:13px;margin-bottom:12px}
+  .ct{font-size:12px;color:#be97c6;margin-bottom:9px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .li{display:inline-flex;align-items:center;gap:3px;font-size:10px}
+  .ld{width:7px;height:7px;border-radius:2px}
+  .badge{font-size:10px;padding:2px 7px;border-radius:5px}
+  .b-sim{background:#3a2e60;color:#be97c6}
+  .b-live{background:#1e3a2e;color:#4aad89}
+  .b-err{background:#3a1e25;color:#e88a9a}
+  .api-row{display:flex;gap:6px;align-items:center;margin-bottom:8px}
+  .api-row input[type=text]{flex:1;background:#1a1735;border:0.5px solid #8661c1;color:#efbcd5;border-radius:6px;padding:5px 9px;font-size:11px;outline:none}
+  .api-row input::placeholder{color:#5a5280}
+  .calib-wrap{background:#1a1735;border-radius:5px;height:6px;margin-top:7px;overflow:hidden;display:none}
+  .calib-fill{height:100%;background:#8661c1;width:0%;transition:width 0.8s linear}
+  .mode-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;background:#251f42;border:0.5px solid #8661c1;border-radius:8px;padding:6px 10px}
+  .mode-lbl{font-size:11px;color:#be97c6}
+  .tog{position:relative;width:36px;height:18px;cursor:pointer;flex-shrink:0}
+  .tog input{opacity:0;width:0;height:0}
+  .tsl{position:absolute;inset:0;background:#1a1735;border-radius:9px;transition:background 0.2s}
+  .tsl:before{content:'';position:absolute;width:12px;height:12px;left:3px;top:3px;background:#be97c6;border-radius:50%;transition:transform 0.2s}
+  input:checked+.tsl{background:#8661c1}
+  input:checked+.tsl:before{transform:translateX(18px);background:#fff}
+  .log{background:#1a1735;border-radius:7px;padding:8px 10px;font-size:10px;color:#be97c6;margin-top:8px;min-height:28px;line-height:1.6}
+</style>
+
+<div class="db" role="main">
+  <h2 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Cognitive Load Dashboard — posts simulated vitals to real API, reads back cognitive load in real time.</h2>
+
+  <div class="hdr">
+    <h1>Cognitive Load Monitor</h1>
+    <p>Paas 1–9 · Full API loop</p>
+  </div>
+
+  <div class="mrow">
+    <div class="mc">
+      <div class="lbl">Heart Rate</div>
+      <div class="val" id="hrDisp">—</div>
+      <div class="sub">bpm · base <span id="hrBase">—</span></div>
+    </div>
+    <div class="mc">
+      <div class="lbl">Breath Rate</div>
+      <div class="val" id="brDisp">—</div>
+      <div class="sub">brpm · base <span id="brBase">—</span></div>
+    </div>
+    <div class="mc">
+      <div class="lbl">Current Load</div>
+      <div class="val" id="curLoad">—</div>
+      <div class="sub">Paas · <span id="hrDelta">Δhr —</span></div>
+      <div class="pbar"><div class="pfill" id="curBar" style="width:0%"></div></div>
+    </div>
+    <div class="mc">
+      <div class="lbl">Predicted Load</div>
+      <div class="val" id="predLoad">—</div>
+      <div class="sub">trend estimate</div>
+      <div class="pbar"><div class="pfill" id="predBar" style="width:0%;background:#efbcd5"></div></div>
+    </div>
+  </div>
+
+  <div class="crow">
+    <div class="cc">
+      <div class="lbl">API endpoint</div>
+      <div class="api-row">
+        <input type="text" id="apiUrl" placeholder="https://your-app.onrender.com" value="https://typ-backend-z2ut.onrender.com">
+        <button class="btn ok" onclick="testApi()">Test</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#be97c6">
+        <span id="apiStatus" style="display:flex;align-items:center"><span class="sdot am"></span>Not tested</span>
+        <span class="badge b-sim" id="modeBadge" style="margin-left:auto">Sim only</span>
+      </div>
+      <div class="log" id="apiLog">Waiting…</div>
+    </div>
+
+    <div class="cc">
+      <div class="lbl">Vitals simulator</div>
+      <div class="mode-row">
+        <span class="mode-lbl">Post to API</span>
+        <label class="tog">
+          <input type="checkbox" id="postToggle">
+          <span class="tsl"></span>
+        </label>
+        <span class="mode-lbl" id="postLbl" style="color:#5a5280">OFF</span>
+      </div>
+      <div class="srow">
+        <span style="font-size:10px;color:#be97c6;width:16px">HR</span>
+        <input type="range" id="hrSlider" min="40" max="180" step="1" value="72">
+        <span class="sv" id="hrSV">72</span>
+      </div>
+      <div class="srow" style="margin-top:6px">
+        <span style="font-size:10px;color:#be97c6;width:16px">BR</span>
+        <input type="range" id="brSlider" min="6" max="40" step="1" value="16">
+        <span class="sv" id="brSV">16</span>
+      </div>
+      <div class="brow">
+        <button class="btn" onclick="sc('rest')">Rest</button>
+        <button class="btn" onclick="sc('focus')">Focus</button>
+        <button class="btn" onclick="sc('stress')">Stress</button>
+        <button class="btn" onclick="sc('peak')">Peak</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="cc" style="margin-bottom:12px">
+    <div class="lbl">Calibration</div>
+    <div class="brow" style="margin-top:0;align-items:center">
+      <span id="calStatus" style="font-size:11px;color:#be97c6;display:flex;align-items:center"><span class="sdot am"></span>Not calibrated</span>
+      <button class="btn ok" id="calBtn" onclick="startCal()" style="margin-left:auto">Start calibration (API)</button>
+    </div>
+    <div class="calib-wrap" id="calWrap"><div class="calib-fill" id="calFill"></div></div>
+  </div>
+
+  <div class="chart-card">
+    <div class="ct">
+      Cognitive load — live
+      <span class="li"><span class="ld" style="background:#efbcd5"></span>Current</span>
+      <span class="li"><span class="ld" style="background:#8661c1;border:1px dashed #be97c6"></span>Predicted</span>
+      <span class="badge b-sim" id="clBadge" style="margin-left:auto">Local calc</span>
+    </div>
+    <div style="position:relative;width:100%;height:220px">
+      <canvas id="loadChart" role="img" aria-label="Real-time cognitive load Paas 1-9">Real-time cognitive load.</canvas>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="ct">
+      Vitals — live
+      <span class="li"><span class="ld" style="background:#efbcd5"></span>HR (bpm)</span>
+      <span class="li"><span class="ld" style="background:#be97c6"></span>BR (brpm)</span>
+      <span class="badge b-sim" id="vBadge" style="margin-left:auto">Simulated</span>
+    </div>
+    <div style="position:relative;width:100%;height:170px">
+      <canvas id="vitalsChart" role="img" aria-label="Real-time heart rate and breath rate">Real-time vitals.</canvas>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const MAX_PTS = 60;
+const WH = 0.6, WB = 0.4, MAX_DELTA = 0.15;
+let curHR = 72, curBR = 16;
+let recentLoads = [];
+let postToApi = false;
+let apiBase = 'https://typ-backend-z2ut.onrender.com';
+let apiOk = false;
+
+const dCur=Array(MAX_PTS).fill(null), dPred=Array(MAX_PTS).fill(null);
+const dHR=Array(MAX_PTS).fill(null), dBR=Array(MAX_PTS).fill(null);
+const labels=Array(MAX_PTS).fill('');
+const gc='#8661c130', tc='#be97c6';
+
+const loadChart = new Chart(document.getElementById('loadChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[...labels],datasets:[
+    {label:'Current',data:[...dCur],borderColor:'#efbcd5',backgroundColor:'rgba(239,188,213,0.07)',tension:0.4,pointRadius:0,fill:true,borderWidth:2},
+    {label:'Predicted',data:[...dPred],borderColor:'#8661c1',backgroundColor:'rgba(134,97,193,0.07)',tension:0.4,pointRadius:0,fill:true,borderWidth:2,borderDash:[5,4]}
+  ]},
+  options:{responsive:true,maintainAspectRatio:false,animation:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y!=null?c.parsed.y.toFixed(1):'—'}`}}},
+    scales:{x:{display:false},y:{min:1,max:9,ticks:{color:tc,font:{size:10},stepSize:1},grid:{color:gc},border:{color:'transparent'}}}
+  }
+});
+
+const vitalsChart = new Chart(document.getElementById('vitalsChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[...labels],datasets:[
+    {label:'HR',data:[...dHR],borderColor:'#efbcd5',backgroundColor:'transparent',tension:0.4,pointRadius:0,borderWidth:1.5},
+    {label:'BR',data:[...dBR],borderColor:'#be97c6',backgroundColor:'transparent',tension:0.4,pointRadius:0,borderWidth:1.5}
+  ]},
+  options:{responsive:true,maintainAspectRatio:false,animation:false,
+    plugins:{legend:{display:false}},
+    scales:{x:{display:false},y:{ticks:{color:tc,font:{size:10}},grid:{color:gc},border:{color:'transparent'}}}
+  }
+});
+
+document.getElementById('hrSlider').addEventListener('input',e=>{curHR=+e.target.value;document.getElementById('hrSV').textContent=curHR;});
+document.getElementById('brSlider').addEventListener('input',e=>{curBR=+e.target.value;document.getElementById('brSV').textContent=curBR;});
+
+document.getElementById('postToggle').addEventListener('change',function(){
+  postToApi=this.checked;
+  document.getElementById('postLbl').textContent=postToApi?'ON':'OFF';
+  document.getElementById('postLbl').style.color=postToApi?'#efbcd5':'#5a5280';
+  if(postToApi && !apiOk){ log('Test the API connection first'); this.checked=false; postToApi=false; document.getElementById('postLbl').textContent='OFF'; document.getElementById('postLbl').style.color='#5a5280'; }
+});
+
+function sc(s){
+  const m={rest:{hr:62,br:12},focus:{hr:85,br:18},stress:{hr:105,br:24},peak:{hr:140,br:35}};
+  curHR=m[s].hr; curBR=m[s].br;
+  document.getElementById('hrSlider').value=curHR; document.getElementById('brSlider').value=curBR;
+  document.getElementById('hrSV').textContent=curHR; document.getElementById('brSV').textContent=curBR;
+}
+
+function log(msg){
+  const t=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  document.getElementById('apiLog').textContent=`[${t}] ${msg}`;
+}
+
+async function testApi(){
+  apiBase=document.getElementById('apiUrl').value.trim().replace(/\/$/,'');
+  const el=document.getElementById('apiStatus');
+  el.innerHTML='<span class="sdot am"></span>Testing…';
+  log('Testing /health…');
+  try{
+    const r=await fetch(apiBase+'/health',{signal:AbortSignal.timeout(4000)});
+    if(r.ok){
+      el.innerHTML='<span class="sdot g"></span>Connected';
+      apiOk=true;
+      document.getElementById('modeBadge').className='badge b-live';
+      document.getElementById('modeBadge').textContent='API ready';
+      log('Connected — flip "Post to API" to start sending');
+    } else { throw new Error('HTTP '+r.status); }
+  } catch(e){
+    el.innerHTML='<span class="sdot r"></span>Unreachable';
+    apiOk=false;
+    log('Error: '+e.message);
+  }
+}
+
+async function startCal(){
+  if(!apiOk){ log('Connect to API first'); return; }
+  document.getElementById('calBtn').disabled=true;
+  log('Posting to /api/calibrate/start…');
+  try{
+    const r=await fetch(apiBase+'/api/calibrate/start',{method:'POST',headers:{'Content-Type':'application/json'}});
+    const d=await r.json();
+    log('Calibration started on server — 90s');
+    document.getElementById('calStatus').innerHTML='<span class="sdot am"></span>Calibrating on server…';
+    document.getElementById('calWrap').style.display='block';
+    let elapsed=0;
+    const t=setInterval(()=>{
+      elapsed++;
+      document.getElementById('calFill').style.width=Math.round(elapsed/90*100)+'%';
+      document.getElementById('calStatus').innerHTML=`<span class="sdot am"></span>Calibrating… ${elapsed}s / 90s`;
+      if(elapsed>=90){
+        clearInterval(t);
+        document.getElementById('calBtn').disabled=false;
+        document.getElementById('calWrap').style.display='none';
+        document.getElementById('calStatus').innerHTML='<span class="sdot g"></span>Calibrated';
+        log('Calibration complete');
+      }
+    },1000);
+  } catch(e){ log('Cal error: '+e.message); document.getElementById('calBtn').disabled=false; }
+}
+
+async function postVitals(hr, br){
+  await Promise.all([
+    fetch(apiBase+'/api/heartrate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({heartRate:hr}),signal:AbortSignal.timeout(2000)}),
+    fetch(apiBase+'/api/breathrate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({breathRate:br}),signal:AbortSignal.timeout(2000)})
+  ]);
+}
+
+async function fetchLoad(){
+  const [hrR,brR,clR,predR]=await Promise.all([
+    fetch(apiBase+'/api/heartrate',{signal:AbortSignal.timeout(2000)}).then(r=>r.json()),
+    fetch(apiBase+'/api/breathrate',{signal:AbortSignal.timeout(2000)}).then(r=>r.json()),
+    fetch(apiBase+'/api/cognitive-load/current',{signal:AbortSignal.timeout(2000)}).then(r=>r.json()),
+    fetch(apiBase+'/api/cognitive-load/predicted',{signal:AbortSignal.timeout(2000)}).then(r=>r.json()),
+  ]);
+  return {hrR,brR,clR,predR};
+}
+
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function calcPredLocal(cur){
+  recentLoads.push(cur); if(recentLoads.length>10)recentLoads.shift();
+  if(recentLoads.length>=6){
+    const ra=recentLoads.slice(-3).reduce((a,b)=>a+b,0)/3;
+    const oa=recentLoads.slice(-6,-3).reduce((a,b)=>a+b,0)/3;
+    return clamp(cur+(ra-oa)*0.5,1,9);
+  }
+  return cur;
+}
+function push(arr,v){arr.shift();arr.push(v);}
+
+async function tick(){
+  const hr = curHR + (Math.random()*1.6-0.8);
+  const br = curBR + (Math.random()*0.5-0.25);
+  const hrR = Math.round(hr), brR = Math.round(br);
+
+  document.getElementById('hrDisp').textContent=hrR;
+  document.getElementById('brDisp').textContent=brR;
+  push(dHR,hrR); push(dBR,brR);
+
+  let cl=null, pl=null;
+
+  if(postToApi && apiOk){
+    try{
+      await postVitals(hrR,brR);
+      const res=await fetchLoad();
+      cl=res.clR.currentCognitiveLoad;
+      pl=res.predR.predictedCognitiveLoad;
+      const isCal=res.clR.isCalibrated;
+      const bhr=res.hrR.baselineHeartRate, bbr=res.brR.baselineBreathRate;
+      document.getElementById('hrBase').textContent=bhr?bhr.toFixed(0):'—';
+      document.getElementById('brBase').textContent=bbr?bbr.toFixed(0):'—';
+      document.getElementById('hrDelta').textContent='Δhr '+res.clR.heartRateDelta.toFixed(2);
+      document.getElementById('calStatus').innerHTML=isCal
+        ?'<span class="sdot g"></span>Calibrated'
+        :'<span class="sdot am"></span>Not calibrated';
+      document.getElementById('clBadge').className='badge b-live';
+      document.getElementById('clBadge').textContent='From API';
+      document.getElementById('vBadge').className='badge b-live';
+      document.getElementById('vBadge').textContent='Posted to API';
+      log(`POST ok · HR ${hrR} BR ${brR} → Load ${cl!=null?cl.toFixed(1):'—'}`);
+    } catch(e){
+      log('Fetch error: '+e.message);
+      document.getElementById('vBadge').className='badge b-err';
+      document.getElementById('vBadge').textContent='API error';
+    }
+  } else {
+    document.getElementById('clBadge').className='badge b-sim';
+    document.getElementById('clBadge').textContent='Local calc';
+    document.getElementById('vBadge').className='badge b-sim';
+    document.getElementById('vBadge').textContent='Simulated';
+  }
+
+  push(dCur, cl!=null?cl:null);
+  push(dPred, pl!=null?pl:calcPredLocal(cl??1));
+
+  if(cl!=null){
+    document.getElementById('curLoad').textContent=cl.toFixed(1);
+    document.getElementById('predLoad').textContent=(pl??calcPredLocal(cl)).toFixed(1);
+    document.getElementById('curBar').style.width=((cl-1)/8*100).toFixed(1)+'%';
+    document.getElementById('predBar').style.width=(((pl??cl)-1)/8*100).toFixed(1)+'%';
+  }
+
+  loadChart.data.datasets[0].data=[...dCur];
+  loadChart.data.datasets[1].data=[...dPred];
+  vitalsChart.data.datasets[0].data=[...dHR];
+  vitalsChart.data.datasets[1].data=[...dBR];
+  loadChart.update('none');
+  vitalsChart.update('none');
+}
+
+setInterval(tick,1000);
+testApi();
+</script>
