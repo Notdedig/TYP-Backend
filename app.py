@@ -315,7 +315,6 @@ async function tick(){
   let hr = curHR, br = curBR;
 
   if(simMode){
-    // In sim mode: add jitter, then POST to API so the server has real data
     hr = Math.round(curHR + (Math.random()*1.6-0.8));
     br = Math.round(curBR + (Math.random()*0.5-0.25));
 
@@ -329,7 +328,6 @@ async function tick(){
     }
   }
 
-  // Always fetch vitals + load from API if connected
   if(apiOk){
     try{
       const [hrR, brR, clR, predR] = await Promise.all([
@@ -375,7 +373,6 @@ async function tick(){
       push(dCur,null); push(dPred,null); push(dHR,null); push(dBR,null);
     }
   } else {
-    // No API — show sim values locally only
     document.getElementById('hrDisp').textContent=Math.round(hr);
     document.getElementById('brDisp').textContent=Math.round(br);
     push(dHR,Math.round(hr)); push(dBR,Math.round(br));
@@ -398,6 +395,168 @@ testApi();
 </html>"""
 
 
+GRAPHS_HTML = r"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cognitive Load — Graphs</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#2e294e;color:#efbcd5;font-family:system-ui,sans-serif;padding:14px;min-height:100vh}
+.hdr{text-align:center;padding:8px 0 14px}
+.hdr h1{font-size:17px;font-weight:500;color:#efbcd5;letter-spacing:1px}
+.hdr p{font-size:11px;color:#be97c6;margin-top:3px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:600px){.grid{grid-template-columns:1fr}}
+.card{background:#3a3560;border:0.5px solid #8661c1;border-radius:10px;padding:13px}
+.ct{font-size:11px;color:#be97c6;margin-bottom:9px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.li{display:inline-flex;align-items:center;gap:3px;font-size:10px}
+.ld{width:7px;height:7px;border-radius:2px}
+.badge{font-size:10px;padding:2px 7px;border-radius:5px;margin-left:auto}
+.b-live{background:#1e3a2e;color:#4aad89}
+.b-sim{background:#3a2e60;color:#be97c6}
+.b-err{background:#3a1e25;color:#e88a9a}
+.sdot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px}
+.g{background:#4aad89}.am{background:#e8a838}.r{background:#c0446a}
+.api-row{display:flex;gap:6px;margin-bottom:8px}
+.api-row input{flex:1;background:#1a1735;border:0.5px solid #8661c1;color:#efbcd5;border-radius:6px;padding:5px 9px;font-size:11px;outline:none}
+.api-row input::placeholder{color:#5a5280}
+.btn{background:#8661c1;color:#fff;border:none;border-radius:7px;padding:5px 12px;font-size:11px;cursor:pointer}
+.btn:hover{background:#9e7ad4}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <h1>Cognitive Load — Graphs</h1>
+  <p id="statusTxt"><span class="sdot am"></span>Not connected</p>
+</div>
+
+<div class="api-row" style="max-width:460px;margin:0 auto 12px">
+  <input type="text" id="apiUrl" placeholder="https://your-app.onrender.com" value="">
+  <button class="btn" onclick="testApi()">Connect</button>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <div class="ct">
+      Cognitive load
+      <span class="li"><span class="ld" style="background:#efbcd5"></span>Current</span>
+      <span class="li"><span class="ld" style="background:#8661c1;border:1px dashed #be97c6"></span>Predicted</span>
+      <span class="badge b-sim" id="clBadge">Waiting</span>
+    </div>
+    <div style="position:relative;width:100%;height:220px">
+      <canvas id="loadChart"></canvas>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ct">
+      Vitals
+      <span class="li"><span class="ld" style="background:#efbcd5"></span>HR (bpm)</span>
+      <span class="li"><span class="ld" style="background:#be97c6"></span>BR (brpm)</span>
+      <span class="badge b-sim" id="vBadge">Waiting</span>
+    </div>
+    <div style="position:relative;width:100%;height:220px">
+      <canvas id="vitalsChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const MAX_PTS=60;
+const gc='#8661c130', tc='#be97c6';
+const dCur=Array(MAX_PTS).fill(null), dPred=Array(MAX_PTS).fill(null);
+const dHR=Array(MAX_PTS).fill(null), dBR=Array(MAX_PTS).fill(null);
+const labels=Array(MAX_PTS).fill('');
+let apiBase='';
+let apiOk=false;
+
+const loadChart=new Chart(document.getElementById('loadChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[...labels],datasets:[
+    {label:'Current',data:[...dCur],borderColor:'#efbcd5',backgroundColor:'rgba(239,188,213,0.07)',tension:0.4,pointRadius:0,fill:true,borderWidth:2},
+    {label:'Predicted',data:[...dPred],borderColor:'#8661c1',backgroundColor:'rgba(134,97,193,0.07)',tension:0.4,pointRadius:0,fill:true,borderWidth:2,borderDash:[5,4]}
+  ]},
+  options:{responsive:true,maintainAspectRatio:false,animation:false,
+    plugins:{legend:{display:false}},
+    scales:{x:{display:false},y:{min:1,max:9,ticks:{color:tc,font:{size:10},stepSize:1},grid:{color:gc},border:{color:'transparent'}}}
+  }
+});
+
+const vitalsChart=new Chart(document.getElementById('vitalsChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[...labels],datasets:[
+    {label:'HR',data:[...dHR],borderColor:'#efbcd5',backgroundColor:'transparent',tension:0.4,pointRadius:0,borderWidth:1.5},
+    {label:'BR',data:[...dBR],borderColor:'#be97c6',backgroundColor:'transparent',tension:0.4,pointRadius:0,borderWidth:1.5}
+  ]},
+  options:{responsive:true,maintainAspectRatio:false,animation:false,
+    plugins:{legend:{display:false}},
+    scales:{x:{display:false},y:{ticks:{color:tc,font:{size:10}},grid:{color:gc},border:{color:'transparent'}}}
+  }
+});
+
+function push(arr,v){arr.shift();arr.push(v);}
+
+async function testApi(){
+  apiBase=document.getElementById('apiUrl').value.trim().replace(/\/$/,'');
+  if(!apiBase) return;
+  document.getElementById('statusTxt').innerHTML='<span class="sdot am"></span>Connecting…';
+  try{
+    const r=await fetch(apiBase+'/health',{signal:AbortSignal.timeout(5000)});
+    if(r.ok){
+      apiOk=true;
+      document.getElementById('statusTxt').innerHTML='<span class="sdot g"></span>Connected · polling 3s';
+      document.getElementById('clBadge').className='badge b-live';
+      document.getElementById('clBadge').textContent='Live';
+      document.getElementById('vBadge').className='badge b-live';
+      document.getElementById('vBadge').textContent='Live';
+    } else throw new Error('HTTP '+r.status);
+  } catch(e){
+    apiOk=false;
+    document.getElementById('statusTxt').innerHTML='<span class="sdot r"></span>Unreachable — '+e.message;
+  }
+}
+
+async function tick(){
+  if(!apiOk) return;
+  try{
+    const [hrR,brR,clR,predR]=await Promise.all([
+      fetch(apiBase+'/api/heartrate',{signal:AbortSignal.timeout(2000)}).then(r=>r.json()),
+      fetch(apiBase+'/api/breathrate',{signal:AbortSignal.timeout(2000)}).then(r=>r.json()),
+      fetch(apiBase+'/api/cognitive-load/current',{signal:AbortSignal.timeout(2000)}).then(r=>r.json()),
+      fetch(apiBase+'/api/cognitive-load/predicted',{signal:AbortSignal.timeout(2000)}).then(r=>r.json()),
+    ]);
+    push(dCur,clR.currentCognitiveLoad);
+    push(dPred,predR.predictedCognitiveLoad);
+    push(dHR,hrR.currentHeartRate?Math.round(hrR.currentHeartRate):null);
+    push(dBR,brR.currentBreathRate?Math.round(brR.currentBreathRate):null);
+    loadChart.data.datasets[0].data=[...dCur];
+    loadChart.data.datasets[1].data=[...dPred];
+    vitalsChart.data.datasets[0].data=[...dHR];
+    vitalsChart.data.datasets[1].data=[...dBR];
+    loadChart.update('none');
+    vitalsChart.update('none');
+  } catch(e){
+    document.getElementById('statusTxt').innerHTML='<span class="sdot r"></span>Fetch error: '+e.message;
+  }
+}
+
+window.onload = () => {
+  const self = window.location.origin;
+  document.getElementById('apiUrl').value = self;
+  apiBase = self;
+  testApi();
+};
+
+setInterval(tick, 3000);
+</script>
+</body>
+</html>"""
+
+
 @app.route('/')
 def home():
     return jsonify({
@@ -414,7 +573,8 @@ def home():
             "GET /api/cognitive-load/predicted/uno": "Get only predicted cognitive load value (number)",
             "POST /api/calibrate/start": "Start calibration",
             "GET /api/calibrate/status": "Get calibration status",
-            "GET /dashboard": "Serve the cognitive load dashboard"
+            "GET /dashboard": "Serve the cognitive load dashboard",
+            "GET /graphs": "Serve the graphs-only view"
         }
     })
 
@@ -532,8 +692,14 @@ def dashboard():
     return Response(DASHBOARD_HTML, mimetype='text/html')
 
 
+@app.route('/graphs')
+def graphs():
+    return Response(GRAPHS_HTML, mimetype='text/html')
+
+
 if __name__ == '__main__':
     print("[*] Starting Cognitive Load API...")
     print("[*] Server running on http://0.0.0.0:8080")
     print("[*] Dashboard: http://localhost:8080/dashboard")
+    print("[*] Graphs:    http://localhost:8080/graphs")
     app.run(host="0.0.0.0", port=8080, debug=False, use_reloader=False)
